@@ -26,3 +26,20 @@
 backend/media/
 # Uploaded resumes and user files
 backend/media/
+# Django collected static files
+backend/staticfiles/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+
+# Node dependencies and build files
+**/node_modules/
+**/dist/

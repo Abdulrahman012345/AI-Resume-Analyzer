@@ -1,10 +1,13 @@
 
 import pdfplumber
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.permissions import AllowAny
+
+from .gemini_service import get_gemini_insights
+from .matching import analyze_resume
 from .serializers import RegisterSerializer
+from .models import Resume, JobDescription, AnalysisResult
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import (
     FormParser,
     MultiPartParser,
@@ -13,16 +16,12 @@ from rest_framework.parsers import (
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Resume, JobDescription, AnalysisResult
-from .matching import analyze_resume
-
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
 class ResumeUploadView(APIView):
     permission_classes = [IsAuthenticated]
-
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -110,7 +109,6 @@ class ResumeUploadView(APIView):
 
 class JobDescriptionCreateView(APIView):
     permission_classes = [IsAuthenticated]
-
     parser_classes = [JSONParser]
 
     def post(self, request):
@@ -148,7 +146,7 @@ class JobDescriptionCreateView(APIView):
 
 
 class ResumeAnalysisView(APIView):
-
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
 
     def post(self, request):
@@ -163,8 +161,15 @@ class ResumeAnalysisView(APIView):
             )
 
         try:
-            resume = Resume.objects.get(id=resume_id)
-            job = JobDescription.objects.get(id=job_id)
+            resume = Resume.objects.get(
+                id=resume_id,
+                owner=request.user
+            )
+
+            job = JobDescription.objects.get(
+                id=job_id,
+                owner=request.user
+            )
 
         except Resume.DoesNotExist:
             return Response(
@@ -184,13 +189,52 @@ class ResumeAnalysisView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Advanced Resume Analysis
+        # Step 1: Existing Advanced Resume Analysis
+        # This always runs, even if Gemini is unavailable.
+
         result = analyze_resume(
             resume.extracted_text,
             job.description
         )
 
-        # Save analysis in database
+        # Step 2: Gemini AI Analysis
+        # If Gemini fails or Free Tier quota is exceeded,
+        # the existing analysis will be used.
+
+        ai_result = get_gemini_insights(
+            resume.extracted_text,
+            job.description
+        )
+
+        if ai_result:
+
+            strengths = (
+                ai_result.get('strengths')
+                or result['strengths']
+            )
+
+            weaknesses = (
+                ai_result.get('weaknesses')
+                or result['weaknesses']
+            )
+
+            suggestions = (
+                ai_result.get('suggestions')
+                or result['suggestions']
+            )
+
+            ai_status = "success"
+
+        else:
+
+            strengths = result['strengths']
+            weaknesses = result['weaknesses']
+            suggestions = result['suggestions']
+
+            ai_status = "unavailable"
+
+        # Step 3: Save analysis in database
+
         analysis = AnalysisResult.objects.create(
             resume=resume,
             job_description=job,
@@ -199,7 +243,8 @@ class ResumeAnalysisView(APIView):
             missing_skills=result['missing_skills']
         )
 
-        # Return complete ATS report
+        # Step 4: Return complete ATS and AI report
+
         return Response(
             {
                 'analysis_id': analysis.id,
@@ -218,18 +263,23 @@ class ResumeAnalysisView(APIView):
                 'found_sections': result['found_sections'],
                 'missing_sections': result['missing_sections'],
 
-                'strengths': result['strengths'],
-                'weaknesses': result['weaknesses'],
-                'suggestions': result['suggestions'],
+                'strengths': strengths,
+                'weaknesses': weaknesses,
+                'suggestions': suggestions,
+
+                'ai_status': ai_status,
 
                 'message': 'Advanced Resume Analysis completed successfully.'
             },
             status=status.HTTP_200_OK
         )
+
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+
         serializer = RegisterSerializer(data=request.data)
 
         if serializer.is_valid():
@@ -253,9 +303,9 @@ class RegisterView(APIView):
         )
 
 
-# 5. Resume History API
-class ResumeHistoryView(APIView):
+# Resume History API
 
+class ResumeHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -263,11 +313,15 @@ class ResumeHistoryView(APIView):
         analyses = AnalysisResult.objects.filter(
             resume__owner=request.user,
             job_description__owner=request.user
-        ).select_related('resume', 'job_description').order_by('-created_at')
+        ).select_related(
+            'resume',
+            'job_description'
+        ).order_by('-created_at')
 
         history = []
 
         for analysis in analyses:
+
             history.append({
                 "analysis_id": analysis.id,
                 "resume_id": analysis.resume.id,
@@ -281,15 +335,18 @@ class ResumeHistoryView(APIView):
                 "created_at": analysis.created_at
             })
 
-        return Response({
-            "count": len(history),
-            "history": history
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "count": len(history),
+                "history": history
+            },
+            status=status.HTTP_200_OK
+        )
 
 
-# 6. Delete Previous Analysis API
+# Delete Previous Analysis API
+
 class DeleteAnalysisView(APIView):
-
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
@@ -303,22 +360,30 @@ class DeleteAnalysisView(APIView):
 
             analysis.delete()
 
-            return Response({
-                "message": "Analysis deleted successfully"
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "message": "Analysis deleted successfully"
+                },
+                status=status.HTTP_200_OK
+            )
 
         except AnalysisResult.DoesNotExist:
 
-            return Response({
-                "error": "Analysis not found"
-            }, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {
+                    "error": "Analysis not found"
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
-# 7. View Previous Analysis API
+# View Previous Analysis API
+
 class ViewAnalysisDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
+
         try:
             analysis = AnalysisResult.objects.select_related(
                 'resume',
@@ -329,18 +394,25 @@ class ViewAnalysisDetailView(APIView):
                 job_description__owner=request.user
             )
 
-            return Response({
-                "analysis_id": analysis.id,
-                "resume_name": analysis.resume.original_name,
-                "job_title": analysis.job_description.job_title,
-                "company_name": analysis.job_description.company_name,
-                "match_score": analysis.match_score,
-                "matched_skills": analysis.matched_skills,
-                "missing_skills": analysis.missing_skills,
-                "created_at": analysis.created_at
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "analysis_id": analysis.id,
+                    "resume_name": analysis.resume.original_name,
+                    "job_title": analysis.job_description.job_title,
+                    "company_name": analysis.job_description.company_name,
+                    "match_score": analysis.match_score,
+                    "matched_skills": analysis.matched_skills,
+                    "missing_skills": analysis.missing_skills,
+                    "created_at": analysis.created_at
+                },
+                status=status.HTTP_200_OK
+            )
 
         except AnalysisResult.DoesNotExist:
-            return Response({
-                "error": "Analysis not found"
-            }, status=status.HTTP_404_NOT_FOUND)
+
+            return Response(
+                {
+                    "error": "Analysis not found"
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
