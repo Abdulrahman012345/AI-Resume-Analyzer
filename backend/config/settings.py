@@ -1,4 +1,7 @@
-
+import pymysql
+pymysql.install_as_MySQLdb()
+from urllib.parse import urlparse, unquote
+import ssl
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -25,7 +28,11 @@ if not SECRET_KEY:
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "ai-resume-analyzer-4jf7.onrender.com",
+]
 
 # Applications
 INSTALLED_APPS = [
@@ -74,16 +81,25 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Database - MySQL
+
+db_url = urlparse(os.getenv("DATABASE_URL"))
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST":  os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "3306"),
+        "NAME": db_url.path.lstrip("/"),
+        "USER": unquote(db_url.username),
+        "PASSWORD": unquote(db_url.password),
+        "HOST": db_url.hostname,
+        "PORT": db_url.port or 3306,
+        "OPTIONS": {
+            "ssl": ssl.create_default_context(),
+            "connect_timeout": 30,
+        },
     }
 }
+
+
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
