@@ -151,6 +151,62 @@ function App() {
       setLoading(false);
     }
   };
+  // REGISTER
+const handleRegister = async () => {
+  if (!username.trim() || !email.trim() || !password) {
+    setError("Please fill all fields.");
+    return;
+  }
+
+  if (password.length < 8) {
+    setError("Password must contain at least 8 characters.");
+    return;
+  }
+
+  setLoading(true);
+  setError("");
+  setMessage("");
+
+  try {
+    const response = await fetch(`${API_URL}/register/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username: username.trim(),
+        email: email.trim(),
+        password,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = Object.entries(data)
+        .map(([field, errors]) => {
+          const messages = Array.isArray(errors)
+            ? errors.join(", ")
+            : String(errors);
+
+          return `${field}: ${messages}`;
+        })
+        .join(" ");
+
+      throw new Error(errorMessage || "Registration failed.");
+    }
+
+    setIsRegisterMode(false);
+    setPassword("");
+    setEmail("");
+    setError("");
+    setMessage("Registration successful! Please login.");
+  } catch (err) {
+    setError(err.message || "Registration failed.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // LOGOUT
   const handleLogout = () => {
@@ -562,87 +618,155 @@ function App() {
       : "Needs improvement";
 
   // LOGIN SCREEN
-  if (!isLoggedIn) {
-    return (
-      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f8f9fc] px-5">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-violet-200/50 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-indigo-100/70 blur-3xl" />
+  // LOGIN / REGISTER SCREEN
+if (!isLoggedIn) {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f8f9fc] px-5">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-violet-200/50 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-indigo-100/70 blur-3xl" />
 
-        <div className="relative w-full max-w-md rounded-3xl border border-white bg-white p-8 shadow-2xl shadow-violet-100 sm:p-10">
-          <div className="mb-6 flex justify-center">
-            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-200">
-              <FileText size={28} />
-            </span>
+      <div className="relative w-full max-w-md rounded-3xl border border-white bg-white p-8 shadow-2xl shadow-violet-100 sm:p-10">
+        <div className="mb-6 flex justify-center">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-200">
+            <FileText size={28} />
+          </span>
+        </div>
+
+        <h1 className="text-center text-3xl font-black tracking-tight text-slate-900">
+          Resume<span className="text-violet-600">AI</span>
+        </h1>
+
+        <p className="mt-2 text-center text-sm text-slate-500">
+          {isRegisterMode
+            ? "Create your ResumeAI account"
+            : "Login to your smart resume analyzer"}
+        </p>
+
+        {error && (
+          <div className="mt-6 flex items-start gap-2 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            {error}
           </div>
+        )}
 
-          <h1 className="text-center text-3xl font-black tracking-tight text-slate-900">
-            Resume<span className="text-violet-600">AI</span>
-          </h1>
+        {message && (
+          <div className="mt-6 flex items-start gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-700">
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+            {message}
+          </div>
+        )}
 
-          <p className="mt-2 text-center text-sm text-slate-500">
-            Login to your smart resume analyzer
-          </p>
+        <form
+          className="mt-8"
+          onSubmit={(e) => {
+            e.preventDefault();
 
-          {error && (
-            <div className="mt-6 flex items-start gap-2 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">
-              <AlertCircle size={18} className="mt-0.5 shrink-0" />
-              {error}
-            </div>
+            if (isRegisterMode) {
+              handleRegister();
+            } else {
+              handleLogin();
+            }
+          }}
+        >
+          <label className="mb-2 block text-sm font-bold text-slate-700">
+            Username
+          </label>
+
+          <input
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter your username"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+          />
+
+          {isRegisterMode && (
+            <>
+              <label className="mb-2 mt-5 block text-sm font-bold text-slate-700">
+                Email
+              </label>
+
+              <input
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+              />
+            </>
           )}
 
-          <form
-            className="mt-8"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleLogin();
-            }}
+          <label className="mb-2 mt-5 block text-sm font-bold text-slate-700">
+            Password
+          </label>
+
+          <input
+            type="password"
+            autoComplete={
+              isRegisterMode ? "new-password" : "current-password"
+            }
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+          />
+
+          {isRegisterMode && (
+            <p className="mt-2 text-xs text-slate-400">
+              Password must contain at least 8 characters.
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-7 w-full rounded-xl bg-violet-600 px-5 py-4 font-extrabold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <label className="mb-2 block text-sm font-bold text-slate-700">
-              Username
-            </label>
+            {loading
+              ? isRegisterMode
+                ? "Creating account..."
+                : "Logging in..."
+              : isRegisterMode
+                ? "Create Account"
+                : "Login to ResumeAI"}
 
-            <input
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
-            />
+            {!loading && (
+              <ArrowRight className="ml-2 inline" size={17} />
+            )}
+          </button>
+        </form>
 
-            <label className="mb-2 mt-5 block text-sm font-bold text-slate-700">
-              Password
-            </label>
-
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
-            />
+        <div className="mt-6 text-center">
+          <p className="text-sm text-slate-500">
+            {isRegisterMode
+              ? "Already have an account?"
+              : "Don't have an account?"}
 
             <button
-              type="submit"
-              disabled={loading}
-              className="mt-7 w-full rounded-xl bg-violet-600 px-5 py-4 font-extrabold text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(!isRegisterMode);
+                setError("");
+                setMessage("");
+                setPassword("");
+                setEmail("");
+              }}
+              className="ml-2 font-bold text-violet-700 hover:text-violet-900"
             >
-              {loading ? "Logging in..." : "Login to ResumeAI"}
-              {!loading && (
-                <ArrowRight className="ml-2 inline" size={17} />
-              )}
+              {isRegisterMode ? "Login" : "Register"}
             </button>
-          </form>
-
-          <p className="mt-6 text-center text-xs leading-5 text-slate-400">
-            Secure account authentication powered by Django.
           </p>
         </div>
-      </div>
-    );
-  }
 
+        <p className="mt-6 text-center text-xs leading-5 text-slate-400">
+          Secure account authentication powered by Django.
+        </p>
+      </div>
+    </div>
+  );
+}
   return (
     <div className="min-h-screen bg-[#f8f9fc] text-slate-800">
 
