@@ -167,3 +167,6 @@ STORAGES = {
 }
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+CORS_ALLOWED_ORIGINS = [
+    "https://ai-resume-analyzer-1-1mo2.onrender.com",
+]
