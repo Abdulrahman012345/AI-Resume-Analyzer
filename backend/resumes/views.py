@@ -1,4 +1,6 @@
+import logging
 
+logger = logging.getLogger(__name__)
 import pdfplumber
 
 from .gemini_service import get_gemini_insights
@@ -313,40 +315,46 @@ class ResumeHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        try:
+            analyses = AnalysisResult.objects.filter(
+                resume__owner=request.user,
+                job_description__owner=request.user
+            ).select_related(
+                'resume',
+                'job_description'
+            ).order_by('-created_at')
 
-        analyses = AnalysisResult.objects.filter(
-            resume__owner=request.user,
-            job_description__owner=request.user
-        ).select_related(
-            'resume',
-            'job_description'
-        ).order_by('-created_at')
+            history = []
 
-        history = []
+            for analysis in analyses:
+                history.append({
+                    "analysis_id": analysis.id,
+                    "resume_id": analysis.resume.id,
+                    "resume_name": analysis.resume.original_name,
+                    "job_description_id": analysis.job_description.id,
+                    "job_title": analysis.job_description.job_title,
+                    "company_name": analysis.job_description.company_name,
+                    "match_score": analysis.match_score,
+                    "matched_skills": analysis.matched_skills,
+                    "missing_skills": analysis.missing_skills,
+                    "created_at": analysis.created_at
+                })
 
-        for analysis in analyses:
-
-            history.append({
-                "analysis_id": analysis.id,
-                "resume_id": analysis.resume.id,
-                "resume_name": analysis.resume.original_name,
-                "job_description_id": analysis.job_description.id,
-                "job_title": analysis.job_description.job_title,
-                "company_name": analysis.job_description.company_name,
-                "match_score": analysis.match_score,
-                "matched_skills": analysis.matched_skills,
-                "missing_skills": analysis.missing_skills,
-                "created_at": analysis.created_at
-            })
-
-        return Response(
-            {
+            return Response({
                 "count": len(history),
                 "history": history
-            },
-            status=status.HTTP_200_OK
-        )
+            }, status=status.HTTP_200_OK)
 
+        except Exception:
+            logger.exception(
+                "Resume History API failed for user_id=%s",
+                request.user.id
+            )
+
+            return Response(
+                {"error": "Unable to load resume history."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 # Delete Previous Analysis API
 
