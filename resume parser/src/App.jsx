@@ -28,7 +28,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const API_URL = "http://127.0.0.1:8000/api";
+const API_URL = "https://ai-resume-analyzer-4jf7.onrender.com/api";
 
 const sampleJD = `We are looking for a Junior Full Stack Python Developer.
 Required skills: Python, Django, React, JavaScript, HTML, CSS, MySQL, REST API, Git.
@@ -320,20 +320,41 @@ function App() {
         );
       }
 
+      // DETERMINE GEMINI STATUS
+      const aiStatus =
+        analysisData.ai_status === "success"
+          ? "success"
+          : "unavailable";
+
+      const aiMessage =
+        analysisData.message ||
+        (aiStatus === "success"
+          ? "Gemini AI generated the resume insights. ATS scores are calculated separately."
+          : "Gemini AI is temporarily unavailable. ATS fallback analysis was used.");
+
       // CONVERT BACKEND RESPONSE
       const analysis = {
         analysisId: analysisData.analysis_id,
+
+        // NEW: AI STATUS
+        aiStatus,
+        aiMessage,
+
+        // ATS SCORES
         overall: Number(analysisData.ats_score || 0),
         skillScore: Number(analysisData.match_score || 0),
         sectionScore: Number(analysisData.section_score || 0),
 
+        // SKILLS
         matched: analysisData.matched_skills || [],
         missing: analysisData.missing_skills || [],
 
+        // AI INSIGHTS OR FALLBACK INSIGHTS
         strengths: analysisData.strengths || [],
         weaknesses: analysisData.weaknesses || [],
         recommendations: analysisData.suggestions || [],
 
+        // RESUME SECTIONS
         sections: [
           ...(analysisData.found_sections || []).map(
             (section) => [section, true]
@@ -349,7 +370,11 @@ function App() {
       // RELOAD HISTORY FROM DATABASE
       await loadHistory();
 
-      setMessage("Resume analysis completed successfully!");
+      setMessage(
+        aiStatus === "success"
+          ? "Gemini AI insights generated successfully!"
+          : "ATS analysis completed. Gemini AI is temporarily unavailable."
+      );
 
       setTimeout(() => {
         document
@@ -479,11 +504,20 @@ function App() {
   const downloadReport = () => {
     if (!result) return;
 
+    const analysisType =
+      result.aiStatus === "success"
+        ? "Gemini AI Insights + ATS Scores"
+        : "ATS Rule-Based Fallback";
+
     const lines = [
       "RESUMEAI - RESUME MATCH REPORT",
       `Role: ${jobTitle || "Not specified"}`,
       `Company: ${company || "Not specified"}`,
       `Resume: ${file?.name || "Not specified"}`,
+      "",
+      `Analysis Type: ${analysisType}`,
+      `Analysis Status: ${result.aiMessage}`,
+      "",
       `ATS Score: ${result.overall}%`,
       `Skills Match: ${result.skillScore}%`,
       `Resume Sections: ${result.sectionScore}%`,
@@ -500,7 +534,10 @@ function App() {
       "RECOMMENDATIONS",
       ...result.recommendations.map((item) => `- ${item}`),
       "",
-      "Note: This is an indicative rule-based analysis, not an official ATS score.",
+      "Note: ATS scores are indicative matching scores, not official ATS scores.",
+      result.aiStatus === "success"
+        ? "Insights: Strengths, weaknesses, and recommendations were generated using Gemini AI."
+        : "Insights: Gemini AI was unavailable. Strengths, weaknesses, and recommendations came from the ATS fallback.",
     ];
 
     const blob = new Blob([lines.join("\n")], {
@@ -705,7 +742,7 @@ function App() {
                 </span>
                 <span className="flex items-center gap-2">
                   <Zap size={16} className="text-amber-500" />
-                  Rule-based analysis
+                  AI insights + ATS matching
                 </span>
               </div>
             </div>
@@ -977,6 +1014,59 @@ function App() {
                 </button>
               </div>
 
+              {/* NEW: GEMINI AI STATUS */}
+              <div
+                className={`mb-6 rounded-2xl border p-5 ${
+                  result.aiStatus === "success"
+                    ? "border-emerald-200 bg-emerald-50"
+                    : "border-amber-200 bg-amber-50"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`grid h-10 w-10 place-items-center rounded-xl ${
+                      result.aiStatus === "success"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {result.aiStatus === "success" ? (
+                      <Sparkles size={21} />
+                    ) : (
+                      <AlertCircle size={21} />
+                    )}
+                  </span>
+
+                  <div>
+                    <p
+                      className={`font-extrabold ${
+                        result.aiStatus === "success"
+                          ? "text-emerald-800"
+                          : "text-amber-800"
+                      }`}
+                    >
+                      {result.aiStatus === "success"
+                        ? "Gemini AI Insights + ATS Scores"
+                        : "ATS Rule-Based Fallback"}
+                    </p>
+
+                    <p
+                      className={`mt-1 text-sm ${
+                        result.aiStatus === "success"
+                          ? "text-emerald-700"
+                          : "text-amber-800"
+                      }`}
+                    >
+                      {result.aiMessage}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <strong>How to read this report:</strong> ATS scores are calculated by the resume matching logic. Gemini AI, when available, generates the strengths, weaknesses, and recommendations.
+              </div>
+
               <div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
                 <div className="flex flex-col items-center justify-center rounded-3xl bg-slate-50 p-7 text-center">
                   <ScoreRing score={result.overall} />
@@ -1093,14 +1183,20 @@ function App() {
               <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50/50 p-6">
                 <h3 className="font-extrabold text-violet-950">Recommended improvements</h3>
                 <ul className="mt-4 grid gap-3 md:grid-cols-2">
-                  {result.recommendations.map((item, index) => (
-                    <li key={index} className="flex gap-2 text-sm leading-6 text-slate-700">
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white text-xs font-extrabold text-violet-700">
-                        {index + 1}
-                      </span>
-                      {item}
+                  {result.recommendations.length ? (
+                    result.recommendations.map((item, index) => (
+                      <li key={index} className="flex gap-2 text-sm leading-6 text-slate-700">
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white text-xs font-extrabold text-violet-700">
+                          {index + 1}
+                        </span>
+                        {item}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-sm text-slate-500">
+                      No recommendations available.
                     </li>
-                  ))}
+                  )}
                 </ul>
               </div>
 

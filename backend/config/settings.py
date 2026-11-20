@@ -87,14 +87,13 @@ db_url = urlparse(os.getenv("DATABASE_URL"))
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": db_url.path.lstrip("/"),
-        "USER": unquote(db_url.username),
-        "PASSWORD": unquote(db_url.password),
-        "HOST": db_url.hostname,
-        "PORT": db_url.port or 3306,
+        "NAME": "resume_analyzer",
+        "USER": "root",
+        "PASSWORD": "1234",
+        "HOST": "127.0.0.1",
+        "PORT": "3306",
         "OPTIONS": {
-            "ssl": ssl.create_default_context(),
-            "connect_timeout": 30,
+            "charset": "utf8mb4",
         },
     }
 }

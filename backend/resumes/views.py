@@ -269,7 +269,11 @@ class ResumeAnalysisView(APIView):
 
                 'ai_status': ai_status,
 
-                'message': 'Advanced Resume Analysis completed successfully.'
+                'message': (
+    'AI-powered Resume Analysis completed successfully.'
+    if ai_status == "success"
+    else 'ATS Resume Analysis completed. Gemini AI is temporarily unavailable.'
+)
             },
             status=status.HTTP_200_OK
         )
