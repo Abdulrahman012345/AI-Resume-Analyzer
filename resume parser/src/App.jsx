@@ -79,6 +79,7 @@ function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
 
   const inputRef = useRef(null);
 
