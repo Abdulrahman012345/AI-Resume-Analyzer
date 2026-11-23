@@ -80,6 +80,7 @@ function App() {
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [email, setEmail] = useState("");
 
   const inputRef = useRef(null);
 
