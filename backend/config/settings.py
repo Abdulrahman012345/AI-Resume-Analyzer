@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import pymysql
 pymysql.install_as_MySQLdb()
 from urllib.parse import urlparse, unquote
@@ -83,22 +87,22 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database - MySQL
 
 db_url = urlparse(os.getenv("DATABASE_URL"))
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "resume_analyzer",
-        "USER": "root",
-        "PASSWORD": "1234",
-        "HOST": "127.0.0.1",
-        "PORT": "3306",
+        "NAME": os.getenv("DB_NAME", "resume_analyzer"),
+        "USER": os.getenv("DB_USER", "root"),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+        "PORT": os.getenv("DB_PORT", "3306"),
         "OPTIONS": {
-            "charset": "utf8mb4",
-        },
+    "charset": "utf8mb4",
+    "ssl": {
+        "ssl": {}
+    },
+},
     }
 }
-
-
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -134,6 +138,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://ai-resume-analyzer-1-1mo2.onrender.com",
 ]
 
 # Email
